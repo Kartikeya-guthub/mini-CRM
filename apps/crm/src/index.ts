@@ -86,6 +86,15 @@ app.post('/api/receipts', async (req, res) => {
 
   // Emit live update to any clients watching this campaign
   if (updatedCampaign) {
+    const { sent_count, delivered_count, failed_count } = updatedCampaign
+
+    if (sent_count > 0 && delivered_count + failed_count >= sent_count) {
+      await prisma.campaign.update({
+        where: { id: communication.campaign_id },
+        data: { status: 'completed' }
+      })
+    }
+
     getIO()
       .to(`campaign:${communication.campaign_id}`)
       .emit('stats_update', {

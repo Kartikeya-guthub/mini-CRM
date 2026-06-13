@@ -1,5 +1,7 @@
 import { PrismaClient } from '@prisma/client'
-import { faker } from '@faker-js/faker'
+import { fakerEN_IN as faker } from '@faker-js/faker'
+import { countCustomersForFilter } from '../src/lib/segmentEngine'
+import { FilterDefinition } from '@xeno/shared'
 
 const prisma = new PrismaClient()
 
@@ -15,10 +17,10 @@ async function main() {
   await prisma.customer.deleteMany()
 
   console.log('Seeding customers...')
-  const customerData = Array.from({ length: 500 }, () => ({
+  const customerData = Array.from({ length: 500 }, (_, i) => ({
     id: faker.string.uuid(),
     name: faker.person.fullName(),
-    email: faker.internet.email({ provider: 'example.com' }),
+    email: `customer_${i}_${faker.string.alphanumeric(4)}@example.com`,
     phone: `+91${faker.string.numeric(10)}`,
     city: faker.helpers.arrayElement(CITIES),
     total_spent: 0,
@@ -54,15 +56,21 @@ async function main() {
   await prisma.order.createMany({ data: orderData })
 
   console.log('Updating customer aggregates...')
-  for (const [customerId, data] of Object.entries(totals)) {
-    await prisma.customer.update({
-      where: { id: customerId },
-      data: {
-        total_spent: parseFloat(data.spent.toFixed(2)),
-        order_count: data.count,
-        last_order_at: data.lastOrder
-      }
-    })
+  const entries = Object.entries(totals)
+  for (let i = 0; i < entries.length; i += 50) {
+    const chunk = entries.slice(i, i + 50)
+    await Promise.all(
+      chunk.map(([customerId, data]) =>
+        prisma.customer.update({
+          where: { id: customerId },
+          data: {
+            total_spent: parseFloat(data.spent.toFixed(2)),
+            order_count: data.count,
+            last_order_at: data.lastOrder
+          }
+        })
+      )
+    )
   }
 
   console.log('Seeding segments...')
@@ -85,6 +93,17 @@ async function main() {
       }
     ]
   })
+
+  // Update customer_count for all segments after seeding
+  const allSegments = await prisma.segment.findMany()
+  for (const segment of allSegments) {
+    const count = await countCustomersForFilter(segment.filter_definition as FilterDefinition)
+    await prisma.segment.update({
+      where: { id: segment.id },
+      data: { customer_count: count }
+    })
+  }
+  console.log('Segment counts updated.')
 
   console.log('Done.')
 }
