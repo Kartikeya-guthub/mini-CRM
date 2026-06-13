@@ -1,0 +1,11 @@
+{
+  "name": "xeno-crm",
+  "private": true,
+  "workspaces": ["apps/*", "shared"],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace=apps/crm\" \"npm run dev --workspace=apps/channel\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.0.0"
+  }
+}

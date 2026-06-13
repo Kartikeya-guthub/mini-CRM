@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Customer {
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  phone         String
+  city          String
+  total_spent   Float     @default(0)
+  last_order_at DateTime?
+  order_count   Int       @default(0)
+  created_at    DateTime  @default(now())
+
+  orders         Order[]
+  communications Communication[]
+
+  @@map("customers")
+}
+
+model Order {
+  id                     String    @id @default(uuid())
+  customer_id            String
+  amount                 Float
+  items                  Json
+  status                 String    @default("completed")
+  attributed_campaign_id String?
+  created_at             DateTime  @default(now())
+
+  customer  Customer  @relation(fields: [customer_id], references: [id])
+  campaign  Campaign? @relation(fields: [attributed_campaign_id], references: [id])
+
+  @@map("orders")
+}
+
+model Segment {
+  id                String    @id @default(uuid())
+  name              String
+  filter_definition Json
+  customer_count    Int       @default(0)
+  created_at        DateTime  @default(now())
+
+  campaigns Campaign[]
+
+  @@map("segments")
+}
+
+model Campaign {
+  id                String    @id @default(uuid())
+  name              String
+  segment_id        String
+  message           String
+  channel           String
+  status            String    @default("draft")
+  sent_count        Int       @default(0)
+  delivered_count   Int       @default(0)
+  failed_count      Int       @default(0)
+  opened_count      Int       @default(0)
+  clicked_count     Int       @default(0)
+  attributed_orders Int       @default(0)
+  created_at        DateTime  @default(now())
+
+  segment        Segment         @relation(fields: [segment_id], references: [id])
+  communications Communication[]
+  orders         Order[]
+
+  @@map("campaigns")
+}
+
+model Communication {
+  id          String   @id @default(uuid())
+  campaign_id String
+  customer_id String
+  channel     String
+  message     String
+  status      String   @default("queued")
+  created_at  DateTime @default(now())
+
+  campaign Campaign            @relation(fields: [campaign_id], references: [id])
+  customer Customer            @relation(fields: [customer_id], references: [id])
+  events   CommunicationEvent[]
+
+  @@map("communications")
+}
+
+model CommunicationEvent {
+  id               String   @id @default(uuid())
+  communication_id String
+  event_type       String
+  created_at       DateTime @default(now())
+
+  communication Communication @relation(fields: [communication_id], references: [id])
+
+  @@unique([communication_id, event_type])
+  @@map("communication_events")
+}
