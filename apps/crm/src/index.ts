@@ -1,18 +1,26 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import http from 'http'
 import { ReceiptPayload, VALID_TRANSITIONS, CommunicationStatus } from '@xeno/shared'
 import { prisma } from './db'
+import { initSocket, getIO } from './socket'
 import campaignRoutes from './routes/campaigns'
-import orderRoutes from './routes/orders'
 import segmentRoutes from './routes/segments'
+import orderRoutes from './routes/orders'
+import aiRoutes from './routes/ai'
 
 dotenv.config()
 
 const app = express()
+const server = http.createServer(app)
 const PORT = process.env.PORT || 3000
 
-app.use(cors())
+initSocket(server)
+
+app.use(cors({
+  origin: ['http://localhost:5173', process.env.FRONTEND_URL || '']
+}))
 app.use(express.json())
 
 app.get('/health', (_req, res) => {
@@ -20,10 +28,10 @@ app.get('/health', (_req, res) => {
 })
 
 app.use('/api/campaigns', campaignRoutes)
-app.use('/api/orders', orderRoutes)
 app.use('/api/segments', segmentRoutes)
+app.use('/api/orders', orderRoutes)
+app.use('/api/ai', aiRoutes)
 
-// Receipt handler — updated with campaign aggregate counts
 app.post('/api/receipts', async (req, res) => {
   const receipt: ReceiptPayload = req.body
 
@@ -56,13 +64,11 @@ app.post('/api/receipts', async (req, res) => {
     throw err
   }
 
-  // Update communication status
   await prisma.communication.update({
     where: { id: receipt.communication_id },
     data: { status: incomingEvent }
   })
 
-  // Increment campaign aggregate count
   const countField: Record<string, string> = {
     delivered: 'delivered_count',
     failed: 'failed_count',
@@ -70,17 +76,33 @@ app.post('/api/receipts', async (req, res) => {
     clicked: 'clicked_count'
   }
 
+  let updatedCampaign = null
   if (countField[incomingEvent]) {
-    await prisma.campaign.update({
+    updatedCampaign = await prisma.campaign.update({
       where: { id: communication.campaign_id },
       data: { [countField[incomingEvent]]: { increment: 1 } }
     })
+  }
+
+  // Emit live update to any clients watching this campaign
+  if (updatedCampaign) {
+    getIO()
+      .to(`campaign:${communication.campaign_id}`)
+      .emit('stats_update', {
+        campaign_id: communication.campaign_id,
+        delivered_count: updatedCampaign.delivered_count,
+        failed_count: updatedCampaign.failed_count,
+        opened_count: updatedCampaign.opened_count,
+        clicked_count: updatedCampaign.clicked_count,
+        attributed_orders: updatedCampaign.attributed_orders
+      })
   }
 
   console.log(`[CRM RECEIPT] ${receipt.communication_id}: ${currentStatus} → ${incomingEvent}`)
   res.json({ ok: true })
 })
 
-app.listen(PORT, () => {
+// Replace app.listen with server.listen
+server.listen(PORT, () => {
   console.log(`CRM running on port ${PORT}`)
 })

@@ -26,16 +26,15 @@ function buildCondition(rule: FilterRule): object {
   }
 }
 
-export async function getCustomersForFilter(filter: FilterDefinition) {
+export function buildWhere(filter: FilterDefinition): object {
   const conditions = filter.rules.map(buildCondition)
-  return prisma.customer.findMany({
-    where: filter.combinator === 'AND' ? { AND: conditions } : { OR: conditions }
-  })
+  return filter.combinator === 'AND' ? { AND: conditions } : { OR: conditions }
+}
+
+export async function getCustomersForFilter(filter: FilterDefinition) {
+  return prisma.customer.findMany({ where: buildWhere(filter) })
 }
 
 export async function countCustomersForFilter(filter: FilterDefinition): Promise<number> {
-  const conditions = filter.rules.map(buildCondition)
-  return prisma.customer.count({
-    where: filter.combinator === 'AND' ? { AND: conditions } : { OR: conditions }
-  })
+  return prisma.customer.count({ where: buildWhere(filter) })
 }
