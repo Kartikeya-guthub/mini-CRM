@@ -30,8 +30,10 @@ export default function NewCampaign() {
     try {
       const r = await api.post('/ai/message', { segment_name: seg.name, channel })
       setMessage(r.data.message)
-    } catch {
-      alert('AI message generation failed. Write it manually.')
+    } catch (err: any) {
+      console.error(err)
+      const errorDetail = err.response?.data?.detail || err.response?.data?.error || err.message
+      alert(`AI message generation failed: ${errorDetail}`)
     } finally {
       setAiLoading(false)
     }
