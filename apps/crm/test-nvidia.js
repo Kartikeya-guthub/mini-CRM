@@ -1,8 +1,8 @@
-import axios from 'axios'
-import { FilterDefinition } from '@xeno/shared'
+const axios = require('axios');
+require('dotenv').config();
 
-const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1'
-const MODEL = 'qwen/qwen3.5-122b-a10b'
+const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1';
+const MODEL = 'qwen/qwen3.5-122b-a10b';
 
 const SYSTEM_PROMPT = `You are a CRM segmentation assistant for an Indian D2C brand. Convert natural language into a structured filter JSON.
 
@@ -31,10 +31,11 @@ Examples:
 "dormant customers not ordering in 45 days" → {"combinator":"AND","rules":[{"field":"last_order_at","operator":"days_ago_gt","value":45}]}
 "loyal high spenders with 5+ orders and 10000+ spend" → {"combinator":"AND","rules":[{"field":"order_count","operator":"gte","value":5},{"field":"total_spent","operator":"gte","value":10000}]}`
 
-export async function nlToFilter(prompt: string): Promise<FilterDefinition> {
-  let response;
+const prompt = 'customers in mumbai';
+
+async function test() {
   try {
-    response = await axios.post(
+    const response = await axios.post(
       `${NVIDIA_BASE_URL}/chat/completions`,
       {
         model: MODEL,
@@ -47,28 +48,16 @@ export async function nlToFilter(prompt: string): Promise<FilterDefinition> {
       },
       {
         headers: {
-          Authorization: `Bearer ${(process.env.NVIDIA_API_KEY || '').trim()}`,
+          Authorization: `Bearer ${process.env.NVIDIA_API_KEY}`,
           'Content-Type': 'application/json'
         },
         timeout: 15000
       }
     )
-  } catch (err: any) {
-    if (err.response) {
-      throw new Error(`NVIDIA API Error: ${err.response.status} - ${JSON.stringify(err.response.data)}`)
-    }
-    throw err
+    console.log("SUCCESS:", response.data.choices[0].message.content);
+  } catch (err) {
+    console.log('ERROR:', err.response?.status, err.response?.statusText);
+    console.log('DATA:', err.response?.data);
   }
-
-  const raw: string = response.data.choices[0].message.content.trim()
-  const clean = raw.replace(/```json|```/g, '').trim()
-
-  const parsed = JSON.parse(clean) as FilterDefinition
-
-  if (!parsed.combinator || !Array.isArray(parsed.rules) || parsed.rules.length === 0) {
-    throw new Error('AI returned invalid filter structure')
-  }
-
-  console.log(`[AI] "${prompt}" → ${JSON.stringify(parsed)}`)
-  return parsed
 }
+test();

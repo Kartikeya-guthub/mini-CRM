@@ -35,7 +35,8 @@ router.post('/segment', async (req, res) => {
     console.error('[AI] Failed:', err.message)
     res.status(422).json({
       error: 'Could not convert prompt to filter',
-      detail: err.message
+      detail: err.message,
+      nvidia_response: err.response?.data
     })
   }
 })
@@ -59,7 +60,7 @@ router.post('/message', async (req, res) => {
         max_tokens: 100
       },
       {
-        headers: { Authorization: `Bearer ${process.env.NVIDIA_API_KEY}`, 'Content-Type': 'application/json' },
+        headers: { Authorization: `Bearer ${(process.env.NVIDIA_API_KEY || '').trim()}`, 'Content-Type': 'application/json' },
         timeout: 15000
       }
     )
@@ -68,7 +69,11 @@ router.post('/message', async (req, res) => {
     res.json({ message })
   } catch (err: any) {
     console.error('[AI] Message generation failed:', err.message)
-    res.status(422).json({ error: 'Failed to generate message' })
+    res.status(422).json({ 
+      error: 'Failed to generate message',
+      detail: err.message,
+      nvidia_response: err.response?.data 
+    })
   }
 })
 
