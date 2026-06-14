@@ -14,7 +14,20 @@ import Redis from 'ioredis'
 
 dotenv.config()
 
-const redis = new Redis(process.env.REDIS_URL || 'redis://default:gQAAAAAAAZaaAAIgcDIxYzFkNThlYjA1OWY0ZGFhODE4NzYwMWQzNTU3YjBlZQ@helped-quetzal-104090.upstash.io:6379')
+const rawRedisUrl = process.env.REDIS_URL || 'redis://default:gQAAAAAAAZaaAAIgcDIxYzFkNThlYjA1OWY0ZGFhODE4NzYwMWQzNTU3YjBlZQ@helped-quetzal-104090.upstash.io:6379'
+const cleanRedisUrl = rawRedisUrl.replace('redis-cli --tls -u ', '').trim()
+
+const redis = new Redis(cleanRedisUrl, {
+  maxRetriesPerRequest: null, // Don't crash on max retries
+  enableOfflineQueue: false,  // Don't hang promises forever if disconnected
+  retryStrategy(times) {
+    return Math.min(times * 50, 2000);
+  }
+})
+
+redis.on('error', (err) => {
+  console.warn('[REDIS] Connection error:', err.message)
+})
 
 const ReceiptSchema = z.object({
   communication_id: z.string().uuid(),
@@ -69,8 +82,13 @@ app.post('/api/receipts', async (req, res) => {
   const receipt = parseResult.data
 
   // REDIS IDEMPOTENCY CHECK
-  const idempotencyKey = `comm:${receipt.communication_id}:${receipt.event}`
-  const isNew = await redis.set(idempotencyKey, '1', 'EX', 86400, 'NX')
+  let isNew: string | null | boolean = true
+  try {
+    const idempotencyKey = `comm:${receipt.communication_id}:${receipt.event}`
+    isNew = await redis.set(idempotencyKey, '1', 'EX', 86400, 'NX')
+  } catch (err: any) {
+    console.warn(`[CRM RECEIPT] Redis failed, bypassing idempotency check: ${err.message}`)
+  }
   
   if (!isNew) {
     console.warn(`[CRM RECEIPT] Redis dup block: ${receipt.event} for ${receipt.communication_id}`)

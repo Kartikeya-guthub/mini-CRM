@@ -38,7 +38,6 @@ export default function CampaignDetail() {
   const [campaign, setCampaign] = useState<CampaignDetailData | null>(null)
   const [communications, setCommunications] = useState<Communication[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   
   const [insights, setInsights] = useState<{ summary: string; recommendation: string; suggested_filter: any } | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
@@ -216,8 +215,8 @@ export default function CampaignDetail() {
       {/* Funnel Chart */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
         <h2 className="font-semibold text-gray-900 mb-4">Engagement Funnel</h2>
-        <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="w-full">
+          <ResponsiveContainer width="100%" height={250}>
             <BarChart 
               data={[
                 { name: 'Sent', count: campaign.sent_count, fill: '#3b82f6' },

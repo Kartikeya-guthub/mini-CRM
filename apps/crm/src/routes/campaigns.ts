@@ -9,8 +9,8 @@ import { z } from 'zod'
 
 const router = Router()
 
-const CRM_BASE_URL = process.env.CRM_BASE_URL || 'http://localhost:3000'
-const CHANNEL_SERVICE_URL = process.env.CHANNEL_SERVICE_URL || 'http://localhost:4000'
+const CRM_BASE_URL = process.env.CRM_BASE_URL || `http://127.0.0.1:${process.env.PORT || 3000}`
+const CHANNEL_SERVICE_URL = process.env.CHANNEL_SERVICE_URL || 'http://127.0.0.1:4000'
 
 const CampaignCreateSchema = z.object({
   name: z.string().min(1, 'Name is required'),
