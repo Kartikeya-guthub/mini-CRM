@@ -33,31 +33,43 @@ Examples:
 
 export async function nlToFilter(prompt: string): Promise<FilterDefinition> {
   let response;
-  try {
-    response = await axios.post(
-      `${NVIDIA_BASE_URL}/chat/completions`,
-      {
-        model: MODEL,
-        messages: [
-          { role: 'user', content: `${SYSTEM_PROMPT}\n\nConvert this to filter JSON: "${prompt}"` }
-        ],
-        temperature: 0.60,
-        top_p: 0.95,
-        max_tokens: 500
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${(process.env.NVIDIA_API_KEY || '').trim()}`,
-          'Content-Type': 'application/json'
+  let lastError;
+  
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      response = await axios.post(
+        `${NVIDIA_BASE_URL}/chat/completions`,
+        {
+          model: MODEL,
+          messages: [
+            { role: 'user', content: `${SYSTEM_PROMPT}\n\nConvert this to filter JSON: "${prompt}"` }
+          ],
+          temperature: 0.60,
+          top_p: 0.95,
+          max_tokens: 500
         },
-        timeout: 15000
-      }
-    )
-  } catch (err: any) {
-    if (err.response) {
-      throw new Error(`NVIDIA API Error: ${err.response.status} - ${JSON.stringify(err.response.data)}`)
+        {
+          headers: {
+            Authorization: `Bearer ${(process.env.NVIDIA_API_KEY || '').trim()}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 30000 // Increased from 15s to 30s
+        }
+      );
+      // If successful, break out of retry loop
+      break;
+    } catch (err: any) {
+      console.warn(`[AI Segment] Attempt ${attempt} failed: ${err.message}`);
+      lastError = err;
+      if (attempt < 3) await new Promise(r => setTimeout(r, 1000));
     }
-    throw err
+  }
+
+  if (!response) {
+    if (lastError?.response) {
+      throw new Error(`NVIDIA API Error: ${lastError.response.status} - ${JSON.stringify(lastError.response.data)}`);
+    }
+    throw lastError || new Error('Failed to reach NVIDIA API');
   }
 
   const raw: string = response.data.choices[0].message.content.trim()

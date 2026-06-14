@@ -47,23 +47,37 @@ router.post('/message', async (req, res) => {
   if (!segment_name) return res.status(400).json({ error: 'segment_name is required' })
 
   try {
-    const response = await axios.post(
-      `${NVIDIA_BASE_URL}/chat/completions`,
-      {
-        model: MODEL,
-        messages: [{
-          role: 'user',
-          content: `Write a short personalized marketing message for a ${channel || 'email'} campaign targeting "${segment_name}". Keep it under 160 characters. Be conversational with a clear call-to-action. Output ONLY the message text, no quotes, no explanation.`
-        }],
-        temperature: 0.8,
-        top_p: 0.95,
-        max_tokens: 100
-      },
-      {
-        headers: { Authorization: `Bearer ${(process.env.NVIDIA_API_KEY || '').trim()}`, 'Content-Type': 'application/json' },
-        timeout: 15000
+    let response;
+    let lastError;
+    
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        response = await axios.post(
+          `${NVIDIA_BASE_URL}/chat/completions`,
+          {
+            model: MODEL,
+            messages: [{
+              role: 'user',
+              content: `Write a short personalized marketing message for a ${channel || 'email'} campaign targeting "${segment_name}". Keep it under 160 characters. Be conversational with a clear call-to-action. Output ONLY the message text, no quotes, no explanation.`
+            }],
+            temperature: 0.8,
+            top_p: 0.95,
+            max_tokens: 100
+          },
+          {
+            headers: { Authorization: `Bearer ${(process.env.NVIDIA_API_KEY || '').trim()}`, 'Content-Type': 'application/json' },
+            timeout: 30000
+          }
+        );
+        break;
+      } catch (err: any) {
+        console.warn(`[AI Message] Attempt ${attempt} failed: ${err.message}`);
+        lastError = err;
+        if (attempt < 3) await new Promise(r => setTimeout(r, 1000));
       }
-    )
+    }
+
+    if (!response) throw lastError || new Error('Failed to reach NVIDIA API');
 
     const content = response.data?.choices?.[0]?.message?.content
     const message = content ? content.trim() : `Special offer for ${segment_name}! Shop now.`
@@ -114,20 +128,34 @@ Format exactly like this:
 }`
 
   try {
-    const response = await axios.post(
-      `${NVIDIA_BASE_URL}/chat/completions`,
-      {
-        model: MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.4,
-        top_p: 0.95,
-        max_tokens: 400
-      },
-      {
-        headers: { Authorization: `Bearer ${(process.env.NVIDIA_API_KEY || '').trim()}`, 'Content-Type': 'application/json' },
-        timeout: 15000
+    let response;
+    let lastError;
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        response = await axios.post(
+          `${NVIDIA_BASE_URL}/chat/completions`,
+          {
+            model: MODEL,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.4,
+            top_p: 0.95,
+            max_tokens: 400
+          },
+          {
+            headers: { Authorization: `Bearer ${(process.env.NVIDIA_API_KEY || '').trim()}`, 'Content-Type': 'application/json' },
+            timeout: 30000
+          }
+        );
+        break;
+      } catch (err: any) {
+        console.warn(`[AI Insights] Attempt ${attempt} failed: ${err.message}`);
+        lastError = err;
+        if (attempt < 3) await new Promise(r => setTimeout(r, 1000));
       }
-    )
+    }
+
+    if (!response) throw lastError || new Error('Failed to reach NVIDIA API');
 
     const raw = response.data?.choices?.[0]?.message?.content || ''
     const clean = raw.replace(/```json|```/g, '').trim()
