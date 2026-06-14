@@ -58,20 +58,25 @@ router.post('/:id/send', async (req, res) => {
     data: { status: 'running', sent_count: customers.length }
   })
 
-  // Fire sends — non-blocking
-  for (const comm of communicationsData) {
-    const customer = customers.find(c => c.id === comm.customer_id)!
+  // Fire sends — non-blocking with rate limiting
+  ;(async () => {
+    for (const comm of communicationsData) {
+      const customer = customers.find(c => c.id === comm.customer_id)!
 
-    axios.post(`${CHANNEL_SERVICE_URL}/channel/send`, {
-      communication_id: comm.id,
-      recipient: { customer_id: customer.id, email: customer.email, phone: customer.phone },
-      message: comm.message,
-      channel: comm.channel,
-      callback_url: `${CRM_BASE_URL}/api/receipts`
-    } as SendPayload).catch(err =>
-      console.error(`[CRM] Send failed for ${comm.id}:`, err.message)
-    )
-  }
+      axios.post(`${CHANNEL_SERVICE_URL}/channel/send`, {
+        communication_id: comm.id,
+        recipient: { customer_id: customer.id, email: customer.email, phone: customer.phone },
+        message: comm.message,
+        channel: comm.channel as any,
+        callback_url: `${CRM_BASE_URL}/api/receipts`
+      } as SendPayload).catch(err => {
+        console.error(`[CRM] Send failed for ${comm.id}:`, err.message)
+      })
+
+      // Add 50ms delay to prevent Supabase connection pool exhaustion (20 req/sec)
+      await new Promise(resolve => setTimeout(resolve, 50))
+    }
+  })()
 
   res.json({ ok: true, customers_reached: customers.length, campaign_id: campaign.id })
 })
