@@ -93,6 +93,14 @@ Orders: ${attributed_orders || 0}
 Write a natural language summary and recommendation. Then suggest a follow-up audience filter.
 Output ONLY raw JSON. No markdown, no explanation.
 
+For the suggested_filter, ONLY use these fields:
+- total_spent (number)
+- order_count (number)
+- last_order_at (date)
+- city (string)
+- created_at (date)
+And ONLY these operators: gte, lte, gt, lt, eq, neq, in, days_ago_gt, days_ago_lt
+
 Format exactly like this:
 {
   "summary": "1 sentence summarizing the funnel drop-off.",
