@@ -20,7 +20,7 @@ const randomBetween = (min: number, max: number) =>
 async function simulate(payload: SendPayload): Promise<void> {
   const { communication_id, callback_url } = payload
 
-  const fireCallback = async (event: EventType) => {
+  const fireCallback = async (event: EventType, attempt = 1): Promise<void> => {
     try {
       await axios.post(callback_url, {
         communication_id,
@@ -29,7 +29,12 @@ async function simulate(payload: SendPayload): Promise<void> {
       })
       console.log(`[CHANNEL] Fired ${event} for ${communication_id}`)
     } catch (err: any) {
-      console.error(`[CHANNEL] Callback failed for ${event}:`, err.message)
+      if (attempt < 3) {
+        console.warn(`[CHANNEL] Retry ${attempt}/3 for ${event} on ${communication_id}`)
+        await delay(1000 * attempt) // exponential backoff: 1s, 2s
+        return fireCallback(event, attempt + 1)
+      }
+      console.error(`[CHANNEL] Callback failed after 3 attempts for ${event}:`, err.message)
     }
   }
 
@@ -47,6 +52,12 @@ async function simulate(payload: SendPayload): Promise<void> {
   }
 
   await fireCallback('delivered')
+
+  // read — 20% chance
+  await delay(randomBetween(1000, 2000))
+  if (Math.random() < 0.2) {
+    await fireCallback('read')
+  }
 
   // opened — 40% chance
   await delay(randomBetween(2000, 4000))

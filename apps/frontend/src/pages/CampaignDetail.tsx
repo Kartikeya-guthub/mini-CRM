@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Send, CheckCircle, XCircle, Eye, MousePointer, ShoppingBag } from 'lucide-react'
+import { ArrowLeft, Send, CheckCircle, XCircle, Eye, BookOpen, MousePointer, ShoppingBag } from 'lucide-react'
 import { io, Socket } from 'socket.io-client'
 import api from '../api/client'
 import type { Campaign } from '../types'
@@ -14,7 +14,7 @@ interface Communication {
 }
 
 interface CampaignDetailData extends Campaign {
-  rates: { delivery: string; open: string; click: string }
+  rates: { delivery: string; read: string; open: string; click: string }
   segment: { name: string; filter_definition: any }
 }
 
@@ -25,6 +25,7 @@ const statusColor: Record<string, string> = {
   sent:      'bg-blue-100 text-blue-700',
   delivered: 'bg-green-100 text-green-700',
   failed:    'bg-red-100 text-red-700',
+  read:      'bg-teal-100 text-teal-700',
   opened:    'bg-purple-100 text-purple-700',
   clicked:   'bg-indigo-100 text-indigo-700'
 }
@@ -62,14 +63,20 @@ export default function CampaignDetail() {
     socket.on('stats_update', (data) => {
       setCampaign(prev => prev ? {
         ...prev,
+        sent_count: data.sent_count ?? prev.sent_count,
         delivered_count: data.delivered_count,
         failed_count: data.failed_count,
+        read_count: data.read_count ?? 0,
         opened_count: data.opened_count,
         clicked_count: data.clicked_count,
         attributed_orders: data.attributed_orders,
+        status: data.status ?? prev.status,
         rates: {
-          delivery: prev.sent_count > 0
-            ? ((data.delivered_count / prev.sent_count) * 100).toFixed(1) + '%'
+          delivery: (data.sent_count ?? prev.sent_count) > 0
+            ? ((data.delivered_count / (data.sent_count ?? prev.sent_count)) * 100).toFixed(1) + '%'
+            : '0%',
+          read: data.delivered_count > 0
+            ? (((data.read_count ?? 0) / data.delivered_count) * 100).toFixed(1) + '%'
             : '0%',
           open: data.delivered_count > 0
             ? ((data.opened_count / data.delivered_count) * 100).toFixed(1) + '%'
@@ -94,6 +101,7 @@ export default function CampaignDetail() {
     { label: 'Sent',      value: campaign.sent_count,       icon: Send,         color: 'text-blue-600',   bg: 'bg-blue-50' },
     { label: 'Delivered', value: campaign.delivered_count,  icon: CheckCircle,  color: 'text-green-600',  bg: 'bg-green-50' },
     { label: 'Failed',    value: campaign.failed_count,     icon: XCircle,      color: 'text-red-500',    bg: 'bg-red-50' },
+    { label: 'Read',      value: campaign.read_count ?? 0,  icon: BookOpen,     color: 'text-teal-600',   bg: 'bg-teal-50' },
     { label: 'Opened',    value: campaign.opened_count,     icon: Eye,          color: 'text-purple-600', bg: 'bg-purple-50' },
     { label: 'Clicked',   value: campaign.clicked_count,    icon: MousePointer, color: 'text-indigo-600', bg: 'bg-indigo-50' },
     { label: 'Attributed Orders', value: campaign.attributed_orders, icon: ShoppingBag, color: 'text-orange-600', bg: 'bg-orange-50' },
@@ -134,7 +142,7 @@ export default function CampaignDetail() {
       </div>
 
       {/* Funnel stats */}
-      <div className="grid grid-cols-6 gap-3 mb-6">
+      <div className="grid grid-cols-7 gap-3 mb-6">
         {funnel.map(({ label, value, icon: Icon, color, bg }) => (
           <div key={label} className="bg-white rounded-xl border border-gray-200 p-4 text-center">
             <div className={`inline-flex p-2 rounded-lg ${bg} ${color} mb-2`}>
@@ -147,9 +155,10 @@ export default function CampaignDetail() {
       </div>
 
       {/* Rate cards */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-4 gap-3 mb-6">
         {[
           { label: 'Delivery Rate', value: campaign.rates?.delivery ?? '—' },
+          { label: 'Read Rate', value: campaign.rates?.read ?? '—' },
           { label: 'Open Rate', value: campaign.rates?.open ?? '—' },
           { label: 'Click Rate', value: campaign.rates?.click ?? '—' },
         ].map(({ label, value }) => (

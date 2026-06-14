@@ -55,7 +55,7 @@ router.post('/:id/send', async (req, res) => {
 
   await prisma.campaign.update({
     where: { id },
-    data: { status: 'running', sent_count: customers.length }
+    data: { status: 'running' }
   })
 
   // Fire sends — non-blocking
@@ -101,6 +101,10 @@ router.get('/:id', async (req, res) => {
     ? ((campaign.delivered_count / campaign.sent_count) * 100).toFixed(1)
     : '0'
 
+  const readRate = campaign.delivered_count > 0
+    ? ((campaign.read_count / campaign.delivered_count) * 100).toFixed(1)
+    : '0'
+
   const openRate = campaign.delivered_count > 0
     ? ((campaign.opened_count / campaign.delivered_count) * 100).toFixed(1)
     : '0'
@@ -113,6 +117,7 @@ router.get('/:id', async (req, res) => {
     ...campaign,
     rates: {
       delivery: `${deliveryRate}%`,
+      read: `${readRate}%`,
       open: `${openRate}%`,
       click: `${clickRate}%`
     }

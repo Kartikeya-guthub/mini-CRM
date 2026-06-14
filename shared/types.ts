@@ -5,16 +5,18 @@ export type CommunicationStatus =
   | 'sent'
   | 'delivered'
   | 'failed'
+  | 'read'
   | 'opened'
   | 'clicked'
 
-export type EventType = 'sent' | 'delivered' | 'failed' | 'opened' | 'clicked'
+export type EventType = 'sent' | 'delivered' | 'failed' | 'read' | 'opened' | 'clicked'
 
 export const VALID_TRANSITIONS: Record<CommunicationStatus, CommunicationStatus[]> = {
   queued:    ['sent'],
   sent:      ['delivered', 'failed'],
-  delivered: ['opened'],
+  delivered: ['read', 'opened'],
   failed:    [],
+  read:      ['opened'],
   opened:    ['clicked'],
   clicked:   []
 }

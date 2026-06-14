@@ -35,6 +35,7 @@ export interface Campaign {
   sent_count: number
   delivered_count: number
   failed_count: number
+  read_count: number
   opened_count: number
   clicked_count: number
   attributed_orders: number

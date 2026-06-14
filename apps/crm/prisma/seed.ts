@@ -8,13 +8,13 @@ const prisma = new PrismaClient()
 const CITIES = ['Delhi', 'Mumbai', 'Bengaluru', 'Hyderabad', 'Chennai', 'Pune', 'Kolkata', 'Ahmedabad']
 
 async function main() {
-  console.log('Clearing existing data...')
-  await prisma.communicationEvent.deleteMany()
-  await prisma.communication.deleteMany()
-  await prisma.order.deleteMany()
-  await prisma.campaign.deleteMany()
-  await prisma.segment.deleteMany()
-  await prisma.customer.deleteMany()
+  // console.log('Clearing existing data...')
+  // await prisma.communicationEvent.deleteMany()
+  // await prisma.communication.deleteMany()
+  // await prisma.order.deleteMany()
+  // await prisma.campaign.deleteMany()
+  // await prisma.segment.deleteMany()
+  // await prisma.customer.deleteMany()
 
   console.log('Seeding customers...')
   const customerData = Array.from({ length: 500 }, (_, i) => ({
@@ -28,32 +28,40 @@ async function main() {
     created_at: faker.date.past({ years: 2 })
   }))
 
-  await prisma.customer.createMany({ data: customerData })
+  for (let i = 0; i < customerData.length; i += 100) {
+    await prisma.customer.createMany({ data: customerData.slice(i, i + 100) })
+  }
 
   console.log('Seeding orders...')
   const totals: Record<string, { spent: number; count: number; lastOrder: Date }> = {}
 
-  const orderData = Array.from({ length: 2000 }, () => {
+  const orderData = []
+  for (let i = 0; i < 2000; i++) {
     const customer = faker.helpers.arrayElement(customerData)
     const amount = parseFloat(faker.commerce.price({ min: 200, max: 15000 }))
-    const createdAt = faker.date.past({ years: 1 })
+    const createdAt = faker.date.between({ from: customer.created_at, to: new Date() })
 
     if (!totals[customer.id]) totals[customer.id] = { spent: 0, count: 0, lastOrder: createdAt }
-    totals[customer.id].spent += amount
-    totals[customer.id].count += 1
-    if (createdAt > totals[customer.id].lastOrder) totals[customer.id].lastOrder = createdAt
+    
+    if (faker.helpers.arrayElement(['completed', 'completed', 'completed', 'refunded']) === 'completed') {
+      totals[customer.id].spent += amount
+      totals[customer.id].count += 1
+      if (createdAt > totals[customer.id].lastOrder) totals[customer.id].lastOrder = createdAt
+    }
 
-    return {
+    orderData.push({
       id: faker.string.uuid(),
       customer_id: customer.id,
       amount,
       items: [{ name: faker.commerce.productName(), qty: faker.number.int({ min: 1, max: 4 }), price: amount }],
       status: 'completed',
       created_at: createdAt
-    }
-  })
+    })
+  }
 
-  await prisma.order.createMany({ data: orderData })
+  for (let i = 0; i < orderData.length; i += 500) {
+    await prisma.order.createMany({ data: orderData.slice(i, i + 500) })
+  }
 
   console.log('Updating customer aggregates...')
   const entries = Object.entries(totals)

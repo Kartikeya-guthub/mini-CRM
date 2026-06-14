@@ -70,8 +70,10 @@ app.post('/api/receipts', async (req, res) => {
   })
 
   const countField: Record<string, string> = {
+    sent: 'sent_count',
     delivered: 'delivered_count',
     failed: 'failed_count',
+    read: 'read_count',
     opened: 'opened_count',
     clicked: 'clicked_count'
   }
@@ -88,6 +90,7 @@ app.post('/api/receipts', async (req, res) => {
   if (updatedCampaign) {
     const { sent_count, delivered_count, failed_count } = updatedCampaign
 
+    // Mark completed when all messages have a terminal state
     if (sent_count > 0 && delivered_count + failed_count >= sent_count) {
       await prisma.campaign.update({
         where: { id: communication.campaign_id },
@@ -99,8 +102,10 @@ app.post('/api/receipts', async (req, res) => {
       .to(`campaign:${communication.campaign_id}`)
       .emit('stats_update', {
         campaign_id: communication.campaign_id,
+        sent_count: updatedCampaign.sent_count,
         delivered_count: updatedCampaign.delivered_count,
         failed_count: updatedCampaign.failed_count,
+        read_count: updatedCampaign.read_count,
         opened_count: updatedCampaign.opened_count,
         clicked_count: updatedCampaign.clicked_count,
         attributed_orders: updatedCampaign.attributed_orders
