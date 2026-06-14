@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Send, CheckCircle, XCircle, Eye, BookOpen, MousePointer, ShoppingBag } from 'lucide-react'
+import { ArrowLeft, Send, CheckCircle, XCircle, Eye, BookOpen, MousePointer, ShoppingBag, Sparkles, Loader2, ArrowRight } from 'lucide-react'
 import { io, Socket } from 'socket.io-client'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import api from '../api/client'
 import type { Campaign } from '../types'
 
@@ -37,6 +38,11 @@ export default function CampaignDetail() {
   const [campaign, setCampaign] = useState<CampaignDetailData | null>(null)
   const [communications, setCommunications] = useState<Communication[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  
+  const [insights, setInsights] = useState<{ summary: string; recommendation: string; suggested_filter: any } | null>(null)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [creatingSegment, setCreatingSegment] = useState(false)
   const socketRef = useRef<Socket | null>(null)
 
   useEffect(() => {
@@ -108,6 +114,44 @@ export default function CampaignDetail() {
     }
   }, [id])
 
+  const handleAnalyze = async () => {
+    if (!campaign) return
+    setAnalyzing(true)
+    try {
+      const { data } = await api.post('/ai/insights', {
+        campaign_name: campaign.name,
+        segment_name: campaign.segment.name,
+        sent: campaign.sent_count,
+        delivered: campaign.delivered_count,
+        opened: campaign.opened_count,
+        clicked: campaign.clicked_count,
+        attributed_orders: 0
+      })
+      setInsights(data)
+    } catch (err) {
+      console.error('Failed to get insights', err)
+      alert('Failed to generate insights')
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
+  const handleCreateFollowUp = async () => {
+    if (!insights?.suggested_filter) return
+    setCreatingSegment(true)
+    try {
+      const { data } = await api.post('/segments', {
+        name: `${campaign?.name} - Follow Up`,
+        filter_definition: insights.suggested_filter
+      })
+      navigate('/campaigns/new', { state: { segment_id: data.id } })
+    } catch (err) {
+      console.error(err)
+      alert('Failed to create follow-up segment')
+      setCreatingSegment(false)
+    }
+  }
+
   if (loading || !campaign) {
     return <div className="flex items-center justify-center h-full text-gray-400">Loading…</div>
   }
@@ -168,6 +212,87 @@ export default function CampaignDetail() {
           </div>
         ))}
       </div>
+
+      {/* Funnel Chart */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+        <h2 className="font-semibold text-gray-900 mb-4">Engagement Funnel</h2>
+        <div className="h-64 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart 
+              data={[
+                { name: 'Sent', count: campaign.sent_count, fill: '#3b82f6' },
+                { name: 'Delivered', count: campaign.delivered_count, fill: '#10b981' },
+                { name: 'Opened', count: campaign.opened_count, fill: '#8b5cf6' },
+                { name: 'Clicked', count: campaign.clicked_count, fill: '#6366f1' },
+              ]} 
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} />
+              <Tooltip cursor={{ fill: '#f3f4f6' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                {[
+                  { fill: '#3b82f6' },
+                  { fill: '#10b981' },
+                  { fill: '#8b5cf6' },
+                  { fill: '#6366f1' },
+                ].map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.fill} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* AI Insights Section */}
+      {campaign.status === 'completed' && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-purple-50/50 to-indigo-50/50">
+            <div className="flex items-center gap-2">
+              <Sparkles size={18} className="text-purple-600" />
+              <h2 className="font-semibold text-gray-900">Post-Campaign AI Insights</h2>
+            </div>
+            {!insights && (
+              <button
+                onClick={handleAnalyze}
+                disabled={analyzing}
+                className="text-sm px-4 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center gap-2 transition-colors disabled:opacity-50"
+              >
+                {analyzing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                {analyzing ? 'Analyzing...' : 'Generate Insights'}
+              </button>
+            )}
+          </div>
+          {insights && (
+            <div className="p-6">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-medium text-gray-900 mb-1">Summary</h3>
+                  <p className="text-sm text-gray-600">{insights.summary}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-900 mb-1">Recommendation</h3>
+                  <p className="text-sm text-gray-600">{insights.recommendation}</p>
+                </div>
+                {insights.suggested_filter && (
+                  <div className="pt-4 mt-4 border-t border-gray-100 flex items-center justify-between">
+                    <span className="text-sm text-gray-500">AI suggests a follow-up segment targeting engaged customers.</span>
+                    <button
+                      onClick={handleCreateFollowUp}
+                      disabled={creatingSegment}
+                      className="text-sm px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2 transition-colors disabled:opacity-50"
+                    >
+                      {creatingSegment ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
+                      {creatingSegment ? 'Creating...' : 'Create Follow-up Segment'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Rate cards */}
       <div className="grid grid-cols-4 gap-3 mb-6">

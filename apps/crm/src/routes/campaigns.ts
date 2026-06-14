@@ -5,14 +5,28 @@ import { prisma } from '../db'
 import { getCustomersForFilter } from '../lib/segmentEngine'
 import { FilterDefinition, SendPayload } from '@xeno/shared'
 
+import { z } from 'zod'
+
 const router = Router()
 
 const CRM_BASE_URL = process.env.CRM_BASE_URL || 'http://localhost:3000'
 const CHANNEL_SERVICE_URL = process.env.CHANNEL_SERVICE_URL || 'http://localhost:4000'
 
+const CampaignCreateSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  segment_id: z.string().uuid('Invalid segment ID'),
+  message: z.string().min(1, 'Message is required').max(1000, 'Message too long'),
+  channel: z.enum(['whatsapp', 'sms', 'email', 'rcs'])
+})
+
 // Create campaign
 router.post('/', async (req, res) => {
-  const { name, segment_id, message, channel } = req.body
+  const parseResult = CampaignCreateSchema.safeParse(req.body)
+  if (!parseResult.success) {
+    return res.status(400).json({ error: 'Invalid payload', details: parseResult.error.flatten().fieldErrors })
+  }
+  
+  const { name, segment_id, message, channel } = parseResult.data
 
   const segment = await prisma.segment.findUnique({ where: { id: segment_id } })
   if (!segment) return res.status(404).json({ error: 'Segment not found' })

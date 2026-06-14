@@ -78,5 +78,59 @@ router.post('/message', async (req, res) => {
   }
 })
 
+router.post('/insights', async (req, res) => {
+  const { campaign_name, sent, delivered, opened, clicked, attributed_orders, segment_name } = req.body
+
+  const prompt = `You are an expert marketing analyst. Review these campaign results:
+Campaign: ${campaign_name || 'Unknown'}
+Target Audience: ${segment_name || 'Unknown'}
+Sent: ${sent || 0}
+Delivered: ${delivered || 0}
+Opened: ${opened || 0}
+Clicked: ${clicked || 0}
+Orders: ${attributed_orders || 0}
+
+Write a natural language summary and recommendation. Then suggest a follow-up audience filter.
+Output ONLY raw JSON. No markdown, no explanation.
+
+Format exactly like this:
+{
+  "summary": "1 sentence summarizing the funnel drop-off.",
+  "recommendation": "1-2 sentence recommendation for follow-up strategy.",
+  "suggested_filter": {
+    "combinator": "AND",
+    "rules": [
+      { "field": "last_order_at", "operator": "days_ago_gt", "value": 7 }
+    ]
+  }
+}`
+
+  try {
+    const response = await axios.post(
+      `${NVIDIA_BASE_URL}/chat/completions`,
+      {
+        model: MODEL,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.4,
+        top_p: 0.95,
+        max_tokens: 400
+      },
+      {
+        headers: { Authorization: `Bearer ${(process.env.NVIDIA_API_KEY || '').trim()}`, 'Content-Type': 'application/json' },
+        timeout: 15000
+      }
+    )
+
+    const raw = response.data?.choices?.[0]?.message?.content || ''
+    const clean = raw.replace(/```json|```/g, '').trim()
+    const parsed = JSON.parse(clean || '{}')
+
+    res.json(parsed)
+  } catch (err: any) {
+    console.error('[AI] Insights failed:', err.message)
+    res.status(422).json({ error: 'Failed to generate insights', detail: err.message })
+  }
+})
+
 export default router
 

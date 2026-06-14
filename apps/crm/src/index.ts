@@ -9,8 +9,18 @@ import campaignRoutes from './routes/campaigns'
 import segmentRoutes from './routes/segments'
 import orderRoutes from './routes/orders'
 import aiRoutes from './routes/ai'
+import { z } from 'zod'
+import Redis from 'ioredis'
 
 dotenv.config()
+
+const redis = new Redis(process.env.REDIS_URL || 'redis://default:gQAAAAAAAZaaAAIgcDIxYzFkNThlYjA1OWY0ZGFhODE4NzYwMWQzNTU3YjBlZQ@helped-quetzal-104090.upstash.io:6379')
+
+const ReceiptSchema = z.object({
+  communication_id: z.string().uuid(),
+  event: z.enum(['sent', 'delivered', 'failed', 'read', 'opened', 'clicked']),
+  timestamp: z.string()
+})
 
 const app = express()
 const server = http.createServer(app)
@@ -51,7 +61,21 @@ app.get('/api/debug-env', (req, res) => {
 })
 
 app.post('/api/receipts', async (req, res) => {
-  const receipt: ReceiptPayload = req.body
+  const parseResult = ReceiptSchema.safeParse(req.body)
+  if (!parseResult.success) {
+    return res.status(400).json({ error: 'Invalid payload', details: parseResult.error.flatten().fieldErrors })
+  }
+  
+  const receipt = parseResult.data
+
+  // REDIS IDEMPOTENCY CHECK
+  const idempotencyKey = `comm:${receipt.communication_id}:${receipt.event}`
+  const isNew = await redis.set(idempotencyKey, '1', 'EX', 86400, 'NX')
+  
+  if (!isNew) {
+    console.warn(`[CRM RECEIPT] Redis dup block: ${receipt.event} for ${receipt.communication_id}`)
+    return res.json({ ok: true })
+  }
 
   const communication = await prisma.communication.findUnique({
     where: { id: receipt.communication_id }
