@@ -36,7 +36,7 @@ router.post('/:id/send', async (req, res) => {
   if (!campaign) return res.status(404).json({ error: 'Campaign not found' })
   if (campaign.status !== 'draft') return res.status(400).json({ error: 'Campaign already sent' })
 
-  const filter = campaign.segment.filter_definition as FilterDefinition
+  const filter = campaign.segment.filter_definition as unknown as FilterDefinition
   const customers = await getCustomersForFilter(filter)
 
   if (customers.length === 0) return res.status(400).json({ error: 'No customers match this segment' })
