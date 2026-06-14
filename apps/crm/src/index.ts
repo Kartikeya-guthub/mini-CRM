@@ -16,6 +16,13 @@ const app = express()
 const server = http.createServer(app)
 const PORT = process.env.PORT || 3000
 
+// Auto-migrate to add read_count if it doesn't exist (bypassing Prisma Migrate restrictions with PgBouncer)
+prisma.$executeRawUnsafe(`
+  ALTER TABLE "campaigns" ADD COLUMN "read_count" INTEGER NOT NULL DEFAULT 0;
+`).catch(() => {
+  // Ignore error if column already exists
+})
+
 initSocket(server)
 
 app.use(cors({
