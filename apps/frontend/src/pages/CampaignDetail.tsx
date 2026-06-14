@@ -88,6 +88,21 @@ export default function CampaignDetail() {
       } : prev)
     })
 
+    socket.on('comm_update', (data) => {
+      setCommunications(prev => prev.map(c => {
+        if (c.id === data.id) {
+          // Prevent duplicate events
+          if (c.events.some(e => e.event_type === data.event_type)) return c
+          return {
+            ...c,
+            status: data.status,
+            events: [...c.events, { event_type: data.event_type, created_at: data.created_at }]
+          }
+        }
+        return c
+      }))
+    })
+
     return () => {
       socket.disconnect()
     }

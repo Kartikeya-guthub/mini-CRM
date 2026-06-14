@@ -129,6 +129,15 @@ app.post('/api/receipts', async (req, res) => {
       })
   }
 
+  getIO()
+    .to(`campaign:${communication.campaign_id}`)
+    .emit('comm_update', {
+      id: communication.id,
+      status: incomingEvent,
+      event_type: incomingEvent,
+      created_at: new Date().toISOString()
+    })
+
   console.log(`[CRM RECEIPT] ${receipt.communication_id}: ${currentStatus} → ${incomingEvent}`)
   res.json({ ok: true })
 })

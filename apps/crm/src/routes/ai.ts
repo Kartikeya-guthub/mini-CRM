@@ -65,7 +65,8 @@ router.post('/message', async (req, res) => {
       }
     )
 
-    const message = response.data.choices[0].message.content.trim()
+    const content = response.data?.choices?.[0]?.message?.content
+    const message = content ? content.trim() : `Special offer for ${segment_name}! Shop now.`
     res.json({ message })
   } catch (err: any) {
     console.error('[AI] Message generation failed:', err.message)
