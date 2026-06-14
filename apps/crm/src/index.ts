@@ -53,10 +53,6 @@ app.get('/api/debug-env', (req, res) => {
 app.post('/api/receipts', async (req, res) => {
   const receipt: ReceiptPayload = req.body
 
-  if (receipt.event === 'sent') {
-    return res.json({ ok: true })
-  }
-
   const communication = await prisma.communication.findUnique({
     where: { id: receipt.communication_id }
   })
