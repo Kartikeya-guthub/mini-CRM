@@ -55,7 +55,7 @@ router.post('/:id/send', async (req, res) => {
 
   await prisma.campaign.update({
     where: { id },
-    data: { status: 'running' }
+    data: { status: 'running', sent_count: customers.length }
   })
 
   // Fire sends — non-blocking
