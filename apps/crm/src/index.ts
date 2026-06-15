@@ -112,23 +112,6 @@ app.post('/api/receipts', async (req, res) => {
     return res.json({ ok: true })
   }
 
-  try {
-    await prisma.communicationEvent.create({
-      data: { communication_id: receipt.communication_id, event_type: receipt.event }
-    })
-  } catch (err: any) {
-    if (err.code === 'P2002') {
-      console.warn(`[CRM RECEIPT] Duplicate event ${receipt.event}, dropping`)
-      return res.json({ ok: true })
-    }
-    throw err
-  }
-
-  await prisma.communication.update({
-    where: { id: receipt.communication_id },
-    data: { status: incomingEvent }
-  })
-
   const countField: Record<string, string> = {
     delivered: 'delivered_count',
     failed: 'failed_count',
@@ -137,12 +120,43 @@ app.post('/api/receipts', async (req, res) => {
     clicked: 'clicked_count'
   }
 
-  let updatedCampaign = null
-  if (countField[incomingEvent]) {
-    updatedCampaign = await prisma.campaign.update({
-      where: { id: communication.campaign_id },
-      data: { [countField[incomingEvent]]: { increment: 1 } }
-    })
+  let updatedCampaign = null;
+
+  try {
+    const transactionOperations = [
+      // 1. Log event
+      prisma.communicationEvent.create({
+        data: { communication_id: receipt.communication_id, event_type: receipt.event }
+      }),
+      // 2. Update communication status
+      prisma.communication.update({
+        where: { id: receipt.communication_id },
+        data: { status: incomingEvent }
+      })
+    ];
+
+    // 3. Update campaign aggregates
+    if (countField[incomingEvent]) {
+      transactionOperations.push(
+        prisma.campaign.update({
+          where: { id: communication.campaign_id },
+          data: { [countField[incomingEvent]]: { increment: 1 } }
+        }) as any
+      );
+    }
+
+    // Execute all in one database round-trip to prevent connection pool exhaustion and lock contention
+    const results = await prisma.$transaction(transactionOperations);
+    if (countField[incomingEvent]) {
+      updatedCampaign = results[2] as any;
+    }
+  } catch (err: any) {
+    if (err.code === 'P2002') {
+      console.warn(`[CRM RECEIPT] Duplicate event ${receipt.event}, dropping`);
+      return res.json({ ok: true });
+    }
+    console.error(`[CRM RECEIPT] Transaction failed:`, err.message);
+    return res.status(500).json({ error: 'Database transaction failed' });
   }
 
   // Emit live update to any clients watching this campaign
