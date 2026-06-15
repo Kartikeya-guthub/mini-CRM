@@ -100,8 +100,8 @@ Campaign: ${campaign_name || 'Unknown'}
 Target Audience: ${segment_name || 'Unknown'}
 Sent: ${sent || 0}
 Delivered: ${delivered || 0}
-Opened: ${opened || 0}
-Clicked: ${clicked || 0}
+Opened: ${opened || 0} (Open Rate: ${delivered ? ((opened/delivered)*100).toFixed(1) : 0}%)
+Clicked: ${clicked || 0} (Click Rate: ${opened ? ((clicked/opened)*100).toFixed(1) : 0}%)
 Orders: ${attributed_orders || 0}
 
 Write a natural language summary and recommendation. Then suggest a follow-up audience filter.
