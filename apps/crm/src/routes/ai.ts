@@ -6,8 +6,8 @@ import { prisma } from '../db'
 
 const router = Router()
 
-const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1'
-const MODEL = 'qwen/qwen3.5-122b-a10b'
+const GROQ_BASE_URL = 'https://api.groq.com/openai/v1'
+const MODEL = 'llama-3.3-70b-versatile'
 
 router.post('/segment', async (req, res) => {
   const { prompt } = req.body
@@ -36,7 +36,7 @@ router.post('/segment', async (req, res) => {
     res.status(422).json({
       error: 'Could not convert prompt to filter',
       detail: err.message,
-      nvidia_response: err.response?.data
+      groq_response: err.response?.data
     })
   }
 })
@@ -53,7 +53,7 @@ router.post('/message', async (req, res) => {
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         response = await axios.post(
-          `${NVIDIA_BASE_URL}/chat/completions`,
+          `${GROQ_BASE_URL}/chat/completions`,
           {
             model: MODEL,
             messages: [{
@@ -65,7 +65,7 @@ router.post('/message', async (req, res) => {
             max_tokens: 100
           },
           {
-            headers: { Authorization: `Bearer ${(process.env.NVIDIA_API_KEY || '').trim()}`, 'Content-Type': 'application/json' },
+            headers: { Authorization: `Bearer ${(process.env.GROQ_API_KEY || '').trim()}`, 'Content-Type': 'application/json' },
             timeout: 30000
           }
         );
@@ -77,7 +77,7 @@ router.post('/message', async (req, res) => {
       }
     }
 
-    if (!response) throw lastError || new Error('Failed to reach NVIDIA API');
+    if (!response) throw lastError || new Error('Failed to reach Groq API');
 
     const content = response.data?.choices?.[0]?.message?.content
     const message = content ? content.trim() : `Special offer for ${segment_name}! Shop now.`
@@ -87,7 +87,7 @@ router.post('/message', async (req, res) => {
     res.status(422).json({ 
       error: 'Failed to generate message',
       detail: err.message,
-      nvidia_response: err.response?.data 
+      groq_response: err.response?.data 
     })
   }
 })
@@ -134,7 +134,7 @@ Format exactly like this:
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         response = await axios.post(
-          `${NVIDIA_BASE_URL}/chat/completions`,
+          `${GROQ_BASE_URL}/chat/completions`,
           {
             model: MODEL,
             messages: [{ role: 'user', content: prompt }],
@@ -143,7 +143,7 @@ Format exactly like this:
             max_tokens: 400
           },
           {
-            headers: { Authorization: `Bearer ${(process.env.NVIDIA_API_KEY || '').trim()}`, 'Content-Type': 'application/json' },
+            headers: { Authorization: `Bearer ${(process.env.GROQ_API_KEY || '').trim()}`, 'Content-Type': 'application/json' },
             timeout: 30000
           }
         );
@@ -155,7 +155,7 @@ Format exactly like this:
       }
     }
 
-    if (!response) throw lastError || new Error('Failed to reach NVIDIA API');
+    if (!response) throw lastError || new Error('Failed to reach Groq API');
 
     const raw = response.data?.choices?.[0]?.message?.content || ''
     const clean = raw.replace(/```json|```/g, '').trim()

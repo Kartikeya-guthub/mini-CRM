@@ -1,8 +1,8 @@
 import axios from 'axios'
 import { FilterDefinition } from '@xeno/shared'
 
-const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1'
-const MODEL = 'qwen/qwen3.5-122b-a10b'
+const GROQ_BASE_URL = 'https://api.groq.com/openai/v1'
+const MODEL = 'llama-3.3-70b-versatile'
 
 const SYSTEM_PROMPT = `You are a CRM segmentation assistant for an Indian D2C brand. Convert natural language into a structured filter JSON.
 
@@ -38,7 +38,7 @@ export async function nlToFilter(prompt: string): Promise<FilterDefinition> {
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       response = await axios.post(
-        `${NVIDIA_BASE_URL}/chat/completions`,
+        `${GROQ_BASE_URL}/chat/completions`,
         {
           model: MODEL,
           messages: [
@@ -50,7 +50,7 @@ export async function nlToFilter(prompt: string): Promise<FilterDefinition> {
         },
         {
           headers: {
-            Authorization: `Bearer ${(process.env.NVIDIA_API_KEY || '').trim()}`,
+            Authorization: `Bearer ${(process.env.GROQ_API_KEY || '').trim()}`,
             'Content-Type': 'application/json'
           },
           timeout: 30000 // Increased from 15s to 30s
@@ -67,9 +67,9 @@ export async function nlToFilter(prompt: string): Promise<FilterDefinition> {
 
   if (!response) {
     if (lastError?.response) {
-      throw new Error(`NVIDIA API Error: ${lastError.response.status} - ${JSON.stringify(lastError.response.data)}`);
+      throw new Error(`Groq API Error: ${lastError.response.status} - ${JSON.stringify(lastError.response.data)}`);
     }
-    throw lastError || new Error('Failed to reach NVIDIA API');
+    throw lastError || new Error('Failed to reach Groq API');
   }
 
   const raw: string = response.data.choices[0].message.content.trim()

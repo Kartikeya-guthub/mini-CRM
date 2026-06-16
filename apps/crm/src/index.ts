@@ -64,7 +64,7 @@ app.use('/api/ai', aiRoutes)
 
 // TEMP DEBUG ROUTE
 app.get('/api/debug-env', (req, res) => {
-  const key = process.env.NVIDIA_API_KEY
+  const key = process.env.GROQ_API_KEY
   res.json({
     hasKey: !!key,
     keyLength: key?.length || 0,
