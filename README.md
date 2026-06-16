@@ -25,7 +25,7 @@ graph TD
 
     %% External Services
     subgraph External [External APIs]
-        NVIDIA[NVIDIA Qwen LLM]
+        GROQ[Groq Llama 3.3 LLM]
     end
 
     %% Data Layer
@@ -46,7 +46,7 @@ graph TD
     API <-->|Prisma ORM| DB
     Webhook <-->|Idempotency Check| Redis
     
-    AIEngine <-->|Generate Segments, Messages, Insights| NVIDIA
+    AIEngine <-->|Generate Segments, Messages, Insights| GROQ
     
     API -->|Dispatch Comm Payloads| ChannelService
     ChannelService -->|Async Webhook Events| Webhook
@@ -56,7 +56,7 @@ graph TD
 
 ## ✨ Key Features & Engineering Decisions
 
-### 1. AI-Driven Marketing Workflows (NVIDIA Qwen)
+### 1. AI-Driven Marketing Workflows (Groq Llama 3.3)
 We integrated AI into key steps of the marketing funnel to eliminate friction:
 - **Natural Language Segmentation:** Marketers type prompts (e.g., *"Users in Mumbai with >₹10,000 spend"*), and the AI converts it into a strictly typed JSON `FilterDefinition` which directly powers PostgreSQL queries.
 - **Auto-Generated Messaging:** AI writes contextual, channel-specific messages based on the segment parameters.
@@ -68,7 +68,7 @@ To mirror true production environments, the platform is split into two independe
 - **Channel Service:** Simulates an external vendor (like Twilio or SendGrid) that asynchronously processes delivery and engagement events, firing them back to the CRM via webhooks.
 
 ### 3. Upstash Redis Webhook Idempotency
-To prevent duplicate event processing (e.g., if a vendor retries a webhook due to a network timeout), we implemented an ultra-fast Redis Idempotency Layer.
+To prevent duplicate event processing (e.g., if a vendor retries a webhook due to a network timeout), we implemented an ultra-fast Redis Idempotency Layer with TLS enforcement (`rediss://`).
 Before writing to PostgreSQL, the webhook handler executes:
 `SET comm_id:event 1 EX 86400 NX`
 This guarantees exactly-once processing safely in memory.
@@ -84,7 +84,7 @@ All critical API boundaries are protected by **Zod schemas**. By strictly valida
 - Node.js (v20+)
 - PostgreSQL Database
 - Upstash Redis Instance
-- NVIDIA API Key
+- Groq API Key
 
 ### Setup Instructions
 
@@ -95,7 +95,7 @@ All critical API boundaries are protected by **Zod schemas**. By strictly valida
 
 2. **Environment Variables**
    Create `.env` files in both `apps/crm` and `apps/channel` based on `.env.example`.
-   - Ensure `NVIDIA_API_KEY` is set in the CRM service.
+   - Ensure `GROQ_API_KEY` is set in the CRM service.
    - Ensure `REDIS_URL` is set in the CRM service.
 
 3. **Database Setup**
