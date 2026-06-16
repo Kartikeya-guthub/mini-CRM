@@ -14,10 +14,11 @@ import Redis from 'ioredis'
 
 dotenv.config()
 
-const rawRedisUrl = process.env.REDIS_URL || 'redis://default:gQAAAAAAAZaaAAIgcDIxYzFkNThlYjA1OWY0ZGFhODE4NzYwMWQzNTU3YjBlZQ@helped-quetzal-104090.upstash.io:6379'
+const rawRedisUrl = process.env.REDIS_URL || 'rediss://default:gQAAAAAAAZaaAAIgcDIxYzFkNThlYjA1OWY0ZGFhODE4NzYwMWQzNTU3YjBlZQ@helped-quetzal-104090.upstash.io:6379'
 const cleanRedisUrl = rawRedisUrl.replace('redis-cli --tls -u ', '').trim()
+const finalRedisUrl = cleanRedisUrl.includes('upstash.io') ? cleanRedisUrl.replace('redis://', 'rediss://') : cleanRedisUrl
 
-const redis = new Redis(cleanRedisUrl, {
+const redis = new Redis(finalRedisUrl, {
   maxRetriesPerRequest: null, // Don't crash on max retries
   enableOfflineQueue: false,  // Don't hang promises forever if disconnected
   retryStrategy(times) {
